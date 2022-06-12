@@ -5,72 +5,57 @@
 
 using boost::asio::ip::tcp;
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cout << "Usage : " << argv[0] << " <Host>" << std::endl;
         return -1;
     }
 
-    std::array<char, sizeof(int)> send_buffer;
-    std::array<char, 128> read_buffer;
 
     boost::asio::io_context io_context;
-    tcp::resolver resolver{io_context};
-    auto endpoints = resolver.resolve(
-        tcp::endpoint(boost::asio::ip::address_v4::from_string(argv[1]), 233));
+    tcp::resolver resolver{ io_context };
 
-    try {
-        tcp::socket socket{io_context};
-        boost::asio::connect(socket, endpoints);
+    auto endpoints = resolver.resolve(argv[1], "233");
 
-        {
-            size_t len = boost::asio::read(
-                socket, boost::asio::buffer(read_buffer, sizeof(int) * 2));
-            if (len != sizeof(int) * 2) {
-                std::cerr << "Unknown range." << std::endl;
-                return 1;
-            }
-            int border[2];
-            memcpy(border, read_buffer.data(), sizeof(int) * 2);
-            std::cout << "çŒœæ•°çš„èŒƒå›´ä¸ºï¼š" << border[0] << ' ' << border[1]
-                      << '\n';
+    tcp::socket socket{ io_context };
+    boost::asio::connect(socket, endpoints);
+
+    {
+        std::array<int, 2> read_buffer;
+        size_t len = boost::asio::read(
+            socket, boost::asio::buffer(read_buffer));
+        if (len != sizeof(int) * 2) {
+            std::cerr << "Unknown range." << std::endl;
+            return 1;
         }
-
-        for (;;) {
-            {
-                std::cout << "è¾“å…¥ä½ çŒœçš„æ•°å­—: ";
-                int t;
-                std::cin >> t;
-                memcpy(send_buffer.data(), &t, sizeof(int));
-                boost::asio::write(socket, boost::asio::buffer(send_buffer));
-            }
-            {
-                boost::system::error_code ec;
-                boost::asio::read(
-                    socket, boost::asio::buffer(read_buffer, sizeof(int)), ec);
-                if (!ec || ec == boost::asio::error::eof) {
-                    int t;
-                    memcpy(&t, read_buffer.data(), sizeof(int));
-                    if (t == 0) {
-                        std::cout << "å“‡ï¼Œä½ çŒœå¯¹äº†ï¼" << std::endl;
-                        break;
-                    } else if (t < -10) {
-                        std::cout << "å¤ªå°äº†ã€‚" << std::endl;
-                    } else if (t < 0) {
-                        std::cout << "æ¯”è¾ƒæŽ¥è¿‘ï¼Œä½†è¿˜æ˜¯å°äº†ã€‚" << std::endl;
-                    } else if (t > 10) {
-                        std::cout << "å¤ªå¤§äº†ã€‚" << std::endl;
-                    } else {
-                        std::cout << "æ¯”è¾ƒæŽ¥è¿‘ï¼Œä½†è¿˜æ˜¯å¤§äº†ã€‚" << std::endl;
-                    }
-                } else {
-                    throw boost::system::system_error(ec);
-                }
-            }
-        }
-    } catch (std::exception &e) {
-        std::cerr << e.what() << '\n';
+        std::cout << "²ÂÊýµÄ·¶Î§Îª£º" << read_buffer[0] << ' ' << read_buffer[1] << '\n';
     }
 
+    for (;;) {
+        int t;
+
+        std::cout << "ÊäÈëÄã²ÂµÄÊý×Ö: ";
+        std::cin >> t;
+
+        boost::asio::write(socket, boost::asio::buffer(&t, sizeof(int)));
+        boost::asio::read(socket, boost::asio::buffer(&t, sizeof(int)));
+
+        if (t == 0) {
+            std::cout << "ÍÛ£¬Äã²Â¶ÔÁË£¡" << std::endl;
+            break;
+        }
+        else if (t < -10) {
+            std::cout << "Ì«Ð¡ÁË¡£" << std::endl;
+        }
+        else if (t < 0) {
+            std::cout << "±È½Ï½Ó½ü£¬µ«»¹ÊÇÐ¡ÁË¡£" << std::endl;
+        }
+        else if (t > 10) {
+            std::cout << "Ì«´óÁË¡£" << std::endl;
+        }
+        else {
+            std::cout << "±È½Ï½Ó½ü£¬µ«»¹ÊÇ´óÁË¡£" << std::endl;
+        }
+    }
     return 0;
 }
