@@ -20,7 +20,7 @@ public:
             m_socket, boost::asio::buffer(range),
             [this, self = shared_from_this()](
                 const boost::system::error_code &ec, size_t) {
-                if (range[0] == 0 && range[1] == -1) {
+                if (range[0] > range[1]) {
                     range = {1, 1000};
                 }
                 boost::asio::async_write(
