@@ -1,4 +1,5 @@
 #include <boost/asio.hpp>
+#include <boost/format.hpp>
 
 #include <functional>
 #include <iostream>
@@ -16,10 +17,19 @@ public:
 
     tcp::socket &socket() { return m_socket; }
     void start() {
+        std::cout << boost::format(
+                         "New player from %1% is now in the game.\n") %
+                         m_socket.remote_endpoint();
+
         boost::asio::async_read(
             m_socket, boost::asio::buffer(range),
             [this, self = shared_from_this()](
                 const boost::system::error_code &ec, size_t) {
+                if (ec) {
+                    std::cerr
+                        << boost::format("%1% [%2%]\n") % ec.message() % ec;
+                    return;
+                }
                 if (range[0] > range[1]) {
                     range = {1, 1000};
                 }
@@ -33,18 +43,24 @@ public:
 private:
     tcp_connection(boost::asio::io_context &io) : m_socket(io) {}
 
-    void handle_start(const boost::system::error_code & /*ec*/,
+    void handle_start(const boost::system::error_code &ec,
                       size_t /*bytes_transferred*/) {
         static std::random_device rd;
         static std::default_random_engine rng{rd()};
         static std::uniform_int_distribution<int> u(range[0], range[1]);
+
+        if (ec) {
+            std::cerr << boost::format("%1% [%2%]\n") % ec.message() % ec;
+            return;
+        }
+
         m_number = u(rng);
 
-        std::cout << "New Player from " << m_socket.remote_endpoint().address()
-                  << ':' << m_socket.remote_endpoint().port()
-                  << " be in this server. The answer is " << m_number
-                  << ". The range is [" << range[0] << ", " << range[1] << "]"
-                  << std::endl;
+        std::cout << boost::format(
+                         "Player %1%: The range is "
+                         "[%2%, %3%], and the answer is %4%\n") %
+                         m_socket.remote_endpoint() % range[0] % range[1] %
+                         m_number;
 
         boost::asio::async_read(
             m_socket, boost::asio::buffer(buffer),
@@ -55,16 +71,15 @@ private:
     void handle_guess(const boost::system::error_code &ec,
                       size_t /*bytes_transferred*/) {
         if (ec) {
-            std::cerr << ec.message() << std::endl;
+            std::cerr << boost::format("%1% [%2%]\n") % ec.message() % ec;
             return;
         }
         int number = buffer[0];
         int ret = (number - m_number);
         memcpy(buffer.data(), std::addressof(ret), sizeof(int));
 
-        std::cout << "Player from " << m_socket.remote_endpoint().address()
-                  << ':' << m_socket.remote_endpoint().port() << " guesses "
-                  << number << std::endl;
+        std::cout << boost::format("Player from %1% guesses %2%\n") %
+                         m_socket.remote_endpoint() % number;
 
         if (number == m_number) {
             boost::asio::async_write(
@@ -82,7 +97,7 @@ private:
     void handle_report(const boost::system::error_code &ec,
                        size_t /*bytes_transferred*/) {
         if (ec) {
-            std::cerr << ec.message() << " [" << ec << "]" << std::endl;
+            std::cerr << boost::format("%1% [%2%]\n") % ec.message() % ec;
             return;
         }
         boost::asio::async_read(
@@ -93,9 +108,8 @@ private:
 
     void handle_success(const boost::system::error_code /*ec*/,
                         size_t /*bytes_transferred*/) {
-        std::cout << "Player from " << m_socket.remote_endpoint().address()
-                  << ':' << m_socket.remote_endpoint().port() << " wines "
-                  << std::endl;
+        std::cout << boost::format("Player from %1% wins\n") %
+                         m_socket.remote_endpoint();
     }
 
     tcp::socket m_socket;
